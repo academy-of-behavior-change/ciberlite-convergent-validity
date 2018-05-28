@@ -1,0 +1,499 @@
+---
+title: "CIBERlite: convergent validity"
+author: "Gjalt-Jorn Peters & Rik Crutzen"
+date: "`r format(Sys.time(), '%H:%M:%S on %Y-%m-%d %Z (GMT%z)')`"
+output:
+  html_document:
+    toc: true
+---
+
+# Introduction
+
+## Status of this file
+
+This is the R Markdown file for the "CIBERlite: convergent validity" study. This study is a project of the Academy of Behavior Change. The canonical URL for this study is https://ciberlite.com/convergent-validity. Initially, this will resolve to the study's Open Science Framework repository (https://osf.io/pemfz/), but in time it may point to a website to facilitate CIBERlite implementation by prevention organisations. The study's OSF repository (repo) synchronises with the GitHub repo at https://github.com/academy-of-behavior-change/ciberlite-convergent-validity.
+
+This R Markdown file is very much a living document, and as such, also contains all R code. For the CIBERlite plot, scroll down to the CIBERlite plots heading.
+
+Note that because this is a living project, you will probably need the most up-to-date version of the `userfriendlyscience` package (*if* that has been submitted to CRAN yet). See https://userfriendlyscience.com for instructions as to how to install it.
+
+## Background of the project
+
+CIBERlite is a project where we aim to provide an easy-to-use and apply rudimentary approximation of a determinant study, so that practitioners (e.g. for preventions organisations) can feasibly quickly get an idea of which determinants are the most relevant in predicting a given target behavior in a given target population. To develop this method, we conduct a study comparing relative determinant levels for eight behaviors in the general population.
+
+A second goal of CIBERlite, but only one that only emerged as we were working on this project, is to work towards a framework for calibrating determinant operationalisations over behaviors and populations.
+
+The preregistration form for this study is at https://osf.io/pemfz/register/[[[ADD-THIS!!!]]]. That is a good place to start before reading further.
+
+## License of these materials
+
+This file and the other materials in the OSF and GitHub repo's associated with this project are licensed under the Creative Commons attribution share alike license (CC-BY-NC-SA; see http://creativecommons.org/licenses/by-nc-sa/4.0/). This means that you are allowed to copy and distribute these files freely, but you’re not allowed to sell them. It also means that if you create derivative works (i.e. if you remix, transform, or build upon the material), you must distribute your contributions under the same license as the original.
+
+# Setup of R environment
+
+Here, we configure some settings and load the required R packages.
+
+```{r setup}
+
+knitr::opts_chunk$set(echo = TRUE);
+options(ufs.debug = FALSE);
+
+require('userfriendlyscience');
+safeRequire('here');
+safeRequire('data.tree');
+safeRequire('tidyverse');
+safeRequire('gridExtra');
+safeRequire('readODS');
+
+dataPath <- here::here('results-data-raw');
+processedDataPath <- here::here('results-data-processed');
+outputPath <- here::here('results-output');
+
+privateDataFileRegEx <- 'survey_797479_R_data_file_\\[PRIVATE-version]';
+publicDataFileRegEx <- 'survey_797479_R_data_file_\\[PUBLIC-version]';
+dataLoadScriptName <- 'survey_797479_R_syntax_file.R';
+
+categoricalQuestions <- c('sex',
+                          'education');
+
+dataDeletionVarCode <- "dataMustBeDeleted";
+dataDeletionSubQuestionCode <- "delete";
+dataDeletionVarValue <- "2";
+privateFileIdentificationString <- "PRIVATE-";
+publicFileIdentificationString <- "PUBLIC-";
+
+### These are the behaviors in this study
+
+behaviors <- c("alcohol", "coffee", "smoking",
+               "exercise", "marathon");
+
+```
+
+# Determinant structures
+
+This command builds the determinant structures that we will analyse. This uses very much in-progress code from the `userfriendlyscience` package that leverages the `data.tree` package to build a hierarchy of determinants and sub-determinants.
+
+```{r}
+
+detStruct <-
+  lapply(behaviors,
+         function(behav) {
+  return(determinantStructure(behav,
+                              list(behaviorRegEx = behav),
+                              determinantVar("intention",
+                                             "intention",
+                                             determinantVar("attitude",
+                                                            "att"),
+                                             determinantVar("perceivedNorm",
+                                                            "pn"),
+                                             determinantVar("perceivedBehavioralControl",
+                                                            "pbc"))));
+});
+
+```
+
+# Data import and merging
+
+This includes sanitizing the private data files for publication.
+
+```{r}
+
+########################################################################
+###
+### Import data
+###
+########################################################################
+###
+### First delete the data from students who indicated they want their
+### data destroyed (note that this private data file is excluded from
+### synchronization with the GitHub repository, and therefore the OSF
+### repository, using .gitignore)
+###
+########################################################################
+
+### Get a list of all data files in data directory
+privateDataFiles <-
+  list.files(dataPath);
+
+### Select only those matching the regular expression for
+### Open University data files
+privateDataFiles <-
+  grep(privateDataFileRegEx,
+       privateDataFiles,
+       value=TRUE);
+
+if (length(privateDataFiles) > 0) {
+  ### Private data files are present; this means we run on the PC
+  ### of one of the researchers. That means we should sanitize the
+  ### datasets and prepare them for publishing.
+  
+  dataDeletionVarName <- paste0(dataDeletionVarCode,
+                              "_",
+                              dataDeletionSubQuestionCode);
+
+  ### Loop through the files
+  for (currentFilename in privateDataFiles) {
+    
+    ### Run within local, temporary namespace (so that all variables
+    ### are deleted afterwards)
+    local({
+    
+      ### First read in a temporary version of the data
+      dat <-
+        importLimeSurveyData(datafile = file.path(dataPath,
+                                                  currentFilename),
+                             datafileRegEx = privateDataFileRegEx,
+                             scriptfile = file.path(dataPath,
+                                                    dataLoadScriptName),
+                             categoricalQuestions = categoricalQuestions);
+      
+      ### Then get the position of the variable used to indicate whether
+      ### data should be deleted:
+      dataDeletionVarIndex <-
+        grep(dataDeletionVarName, names(dat));
+      
+      ### Then construct the regular expression for matching the lines in
+      ### the dataset that contain the data of participants who indicated
+      ### they wanted their data deleted. A regular expression of the
+      ### following form is constructed:
+      ###
+      ### (?:"[^"]*",){75}"2"
+      ###
+      ### The '75' is the index minus one, and the '2' the value indicating
+      ### that data should be deleted. This regular expression matches any
+      ### value between a pair of double quotes followed by a comma exactly
+      ### 75 times; then matches a '2' between pair of double quotes. This
+      ### pair of double quotes contains the value of the 76th variable (so,
+      ### in this example, the value of the variable indicating whether data
+      ### should be deleted), and therefore, this regular expression matches
+      ### all lines containing data that should be deleted.
+      
+      dataDeletionRegEx <-
+        paste0('(?:"[^"]*",){',
+               dataDeletionVarIndex-1,
+               '}"',
+               dataDeletionVarValue,
+               '"');
+  
+      ### Then read the datafile as character vector
+      fullPrivateDataFile <-
+        readLines(file.path(dataPath,
+                            currentFilename));
+      cat0("\n\nRead data file '", currentFilename, "'.\n\n");
+  
+      ### Get indices of lines that have to be deleted
+      linesToDelete <- grep(dataDeletionRegEx,
+                            fullPrivateDataFile);
+      
+      ### Log deletion
+      cat0("Identified ", length(linesToDelete), " participants who ",
+           "indicated they want their data to be deleted, specifically, ",
+           "the following lines of the original raw dataset:\n\n",
+           vecTxtQ(linesToDelete));
+      
+      ### Delete those lines
+      if (length(linesToDelete) > 0) {
+        fullPublicDataFile <- fullPrivateDataFile[-linesToDelete];
+      } else {
+        fullPublicDataFile <- fullPrivateDataFile;
+      }
+  
+      ### Construct new filename to write public version of data to
+      newTmpFilename <- sub(privateFileIdentificationString,
+                            publicFileIdentificationString,
+                            currentFilename,
+                            fixed=TRUE);
+      
+      ### Store new datafile
+      writeLines(fullPublicDataFile,
+                 file.path(dataPath,
+                           newTmpFilename));
+  
+      cat0("\n\nStored data file '", newTmpFilename, "'.\n\n");
+  
+    });  ### End local namespace
+  
+  }
+}
+
+########################################################################
+### Import data from public version of the survey
+########################################################################
+
+dat.raw <-
+  importLimeSurveyData(dataPath = dataPath,
+                       datafileRegEx = publicDataFileRegEx,
+                       scriptfile = file.path(dataPath,
+                                              dataLoadScriptName),
+                       categoricalQuestions = categoricalQuestions);
+
+### Verify that no entries were read where people indicated they wanted
+### their data removed
+if (any(dat.raw[, dataDeletionVarName]==dataDeletionVarValue, na.rm=TRUE)) {
+  stop("The public data contains data from people who indicated they ",
+       "wanted their data to be removed!");
+} else {
+  ### Delete variable storing whether people want their data deleted,
+  ### so that the data can be easily merged with the dataset from
+  ### ondrzk.nl
+  dat.raw[, grepl(dataDeletionVarCode,
+                  names(dat.raw))] <- NULL;
+}
+
+dat <- dat.raw;
+
+```
+
+# CIBERlite function definition
+
+Note that this function, when done, will be integrated into the userfriendlyscience package.
+
+```{r}
+### Add variables names of the determinants' measures and compute
+### means where necessary
+for (i in seq_along(detStruct)) {
+  detStructAddVarNames(detStruct[[i]], names(dat));
+  dat <- detStructComputeScales(detStruct[[i]],
+                                dat);
+}
+
+### View means
+# lapply(dat[, grepl('attitude', names(dat))], mean, na.rm=TRUE);
+# lapply(dat[, grepl('perceivedNorm', names(dat))], mean, na.rm=TRUE);
+# lapply(dat[, grepl('perceivedBehavioralControl', names(dat))], mean, na.rm=TRUE);
+
+CIBERlite <- function(data,
+                      determinants,
+                      targets,
+                      determinantOrder = NULL,
+                      determinantLabels = NULL,
+                      subDeterminantLabels = NULL,
+                      title=NULL,
+                      conf.level = list(means = 0.9999,
+                                        associations = 0.95),
+                      scaleRange = NULL,
+                      determinantAesthetics = list(fill = 'black',
+                                                   color=NA,
+                                                   alpha=.5),
+                      subDeterminantAesthetics = list(fill = 'black',
+                                                      color=NA,
+                                                      alpha=.5),
+                      rDiamondAesthetics = list(fill = '#c4c4c4',
+                                                color=NA,
+                                                alpha=.75)) {
+
+  if (is.list(determinants)) {
+    subDeterminantNames <- unlist(determinants);
+    determinantNames <- names(determinants);
+  } else {
+    subDeterminantNames <- c();
+    determinantNames <- determinants;
+  }
+  if (is.null(determinantOrder)) {
+    determinantOrder <- seq_along(determinantNames);
+  }
+
+  if (getOption('ufs.debug', FALSE)) {
+    cat("\n", repStr("-", 50), "\n");
+    print(targets);
+    print(determinantNames);
+    print(subDeterminantNames);
+  }
+  
+  ### Select relevant rows from dataset
+  dat <- data[, c(targets, determinantNames, subDeterminantNames)];
+  
+  ### Set minimum and maximum for the used scales, if not provided
+  if (is.null(scaleRange)) {
+    scaleRange <- c(min(dat[, c(determinantNames, subDeterminantNames)], na.rm=TRUE),
+                    max(dat[, c(determinantNames, subDeterminantNames)], na.rm=TRUE));
+  }
+  
+  if (getOption('ufs.debug', FALSE)) {
+    cat("\n", repStr("-", 50), "\n");
+    print(determinantOrder);
+    print(scaleRange);
+  }
+  
+  # print(dim(is.na(dat[, c(determinantNames, subDeterminantNames)])));
+  # print((scaleRange[2] - scaleRange[1]));
+  # print(class(dim(((dat[, c(determinantNames, subDeterminantNames)] - scaleRange[1]) /
+  #             (scaleRange[2] - scaleRange[1])))));
+  
+  ### Translate subdeterminants and determinants to 0-1 range
+  dat[, c(determinantNames, subDeterminantNames)] <-
+    ((dat[, c(determinantNames, subDeterminantNames)] - scaleRange[1]) /
+              (scaleRange[2] - scaleRange[1]));
+  
+  if (is.list(determinants)) {
+    ### We also have subdeterminants, so also get the means for those.
+    
+    subDeterminantDat<- sapply(dat[, subDeterminantNames],
+                               function(x) {
+                                 return(c(mean = mean(x, na.rm=TRUE),
+                                          sd = sd(x, na.rm=TRUE)));
+                               }) %>% t %>% as.data.frame;
+    subDeterminantDat$subdeterminant <- row.names(subDeterminantDat);
+    subDeterminantDat$determinant <- rep(determinantNames,
+                                         sapply(determinants, length));
+    subDeterminantDat$xPos <- rep(determinantOrder,
+                                  sapply(determinants, length));
+  }
+
+  determinantDat <- sapply(dat[, determinantNames],
+                           function(x) {
+                             return(c(mean = mean(x, na.rm=TRUE),
+                                      sd = sd(x, na.rm=TRUE)));
+                           }) %>%
+    t %>%
+    as.data.frame;
+  determinantDat$determinant <- row.names(determinantDat);
+  determinantDat$xPos <- determinantOrder;
+  
+  determinantTargetCorObject <-
+    associationMatrix(dat,
+                      x = determinantNames,
+                      y = targets);
+  
+  determinantTarget.r <-
+    determinantTargetCorObject$output$raw$es;
+  determinantTarget.ci.lo <-
+    determinantTargetCorObject$output$raw$ci.lo;
+  determinantTarget.ci.hi <-
+    determinantTargetCorObject$output$raw$ci.hi;
+  
+  rDiamondCoordinates <-
+    lapply(1:length(targets), function(targetIndex) {
+      tmpDf <- cbind(determinantTargetCorObject$output$raw$ci.lo[, targetIndex],
+                                       determinantTargetCorObject$output$raw$es[, targetIndex],
+                                       determinantTargetCorObject$output$raw$ci.hi[, targetIndex]);
+      return(lapply(1:nrow(tmpDf),
+                    function(determinantIndex) {
+                      return(diamondCoordinates(tmpDf[determinantIndex, ],
+                                                otherAxisValue = determinantIndex));
+                    }));
+     });
+  
+  rDiamondLayer <- 
+    lapply(1:length(targets), function(targetIndex) {
+      tmpDf <-
+        cbind(determinantTargetCorObject$output$raw$ci.lo[, targetIndex],
+              determinantTargetCorObject$output$raw$es[, targetIndex],
+              determinantTargetCorObject$output$raw$ci.hi[, targetIndex]) %>%
+        as.data.frame;
+      return(ggDiamondLayer(tmpDf,
+                            direction="vertical",
+                            color=rDiamondAesthetics$fill,
+                            lineColor=rDiamondAesthetics$color,
+                            alpha=rDiamondAesthetics$alpha));
+     });
+
+  if (getOption('ufs.debug', FALSE)) {
+    cat("\n", repStr("-", 50), "\n");
+    print(determinantDat);
+    cat("\n", repStr("-", 50), "\n");
+    print(subDeterminantDat);
+    cat("\n", repStr("-", 50), "\n");
+    print(rDiamondCoordinates);
+    cat("\n", repStr("-", 50), "\n");
+  }
+  
+  if (is.null(determinantLabels)) {
+    determinantLabels <- determinantNames;
+  }
+  if (is.null(subDeterminantLabels)) {
+    subDeterminantLabels <- subDeterminantNames;
+  }
+
+  ggplot() +
+    geom_hline(yintercept = c(0, 1),
+               color="black") +
+    geom_bar(data = subDeterminantDat,
+             aes_string(x = 'xPos',
+                        y = 'mean',
+                        group = 'subdeterminant'),
+             stat='identity',
+             position='dodge',
+             fill=subDeterminantAesthetics$fill,
+             color=subDeterminantAesthetics$color,
+             alpha=subDeterminantAesthetics$alpha) +
+    geom_bar(data = determinantDat,
+             aes_string(x = 'xPos',
+                        y = 'mean'),
+             stat='identity',
+             position='identity',
+             fill=determinantAesthetics$fill,
+             color=determinantAesthetics$color,
+             alpha=determinantAesthetics$alpha) +
+    rDiamondLayer +
+    theme_minimal() +
+    coord_cartesian(ylim=c(0,1)) +
+    scale_x_continuous(breaks=determinantOrder,
+                       labels=determinantLabels,
+                       sec.axis=dup_axis(breaks=c(determinantOrder-.25,
+                                                  determinantOrder+.25),
+                                         labels=c(subDeterminantLabels[is.odd(seq_along(subDeterminantLabels))],
+                                                  subDeterminantLabels[is.even(seq_along(subDeterminantLabels))]))) +
+    ggtitle(title) +
+    xlab(NULL) +
+    ylab(NULL);
+}
+
+```
+
+# CIBERlite plots
+
+```{r results="asis"}
+
+### Set plot titles by adding expectations regarding determinant values
+plotSubTitles <- c(coffee = "Not drinking any coffee at all\n(Att: lo, PN: lo, PBC: lo)",
+                   publicTransport = "Mainly traveling by public transport\n(Att: lo, PN: hi, PBC: lo)",
+                   runRedLight = "Sometimes running a red light (by bike)\n(Att: lo, PN: lo, PBC: hi)",
+                   wasteSeparation = "Always carefully separating waste\n(Att: lo, PN: hi, PBC: hi)",
+                   conSomebody = "Con somebody for 10.000 euro\n(Att: hi, PN: lo, PBC: lo)",
+                   marathon = "Finish a marathon\n(Att: hi, PN: hi, PBC: lo)",
+                   longShower = "Often take extra long showers\n(Att: hi, PN: lo, PBC: hi)",
+                   brushingTeeth = "Brush your teeth every day\n(Att: hi, PN: hi, PBC: hi)");
+
+CIBERlitePlots <- lapply(seq_along(detStruct),
+                         function(i) {
+                           behaviorName <- detStruct[[i]]$behaviorRegEx;
+                           detStructVars <-
+                             detStruct[[i]]$Get('varNames', filterFun=isLeaf);
+                           ### Set name to variable name of overarching determinant
+                           names(detStructVars) <-
+                             detStruct[[i]]$Get("scaleVarName", filterFun=isLeaf);
+                           return(CIBERlite(dat,
+                                            determinants=detStructVars,
+                                            determinantLabels=c('Att', 'PN', 'PBC'),
+                                            subDeterminantLabels=c("Exp", "Ins", "Inj", "Des", "Cap", "Con"),
+                                            scaleRange=c(1,5),
+                                            targets=detStruct[[i]]$intention$scaleVarName) +
+                                    ggtitle(behaviorName,
+                                            subtitle = plotSubTitles[behaviorName]) +
+                                    theme(plot.subtitle=element_text(size=8)));
+                         });
+
+combinedCIBERlitePlot <- arrangeGrob(grobs=CIBERlitePlots, ncol=4);
+
+knitFig(combinedCIBERlitePlot,
+        figWidth=21/2.54,
+        figHeight=14/2.54,
+        figCaption="Figure 1: a CIBER plot. Note that in their operationalitions, all these behaviors related to the next month (... for the next month, ... in the next month, etc).<br />Att = Attitude, PN = Perceived Norm, PBC = Perceived Behavioral Control, Exp = Experiential Attitude, Ins = Instrumental Attitude, Inj = Injunctive Norm, Des = Descriptive Norm, Cap = Capacity, Con = Control.");
+
+ggsave(plot = combinedCIBERlitePlot,
+       file = file.path(outputPath,
+                        "Figure-1.png"),
+       dpi=300,
+       width=21,
+       height=14,
+       units="cm");
+
+```
+
+# Correlation between the two sub-determinants
+
+```{r}
+cor(dat[, unlist(detStruct[[1]]$intention$perceivedNorm$varNames)], use='complete');
+
+```
