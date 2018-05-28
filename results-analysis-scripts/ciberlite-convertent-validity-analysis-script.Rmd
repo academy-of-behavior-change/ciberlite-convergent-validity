@@ -75,19 +75,34 @@ This command builds the determinant structures that we will analyse. This uses v
 
 ```{r}
 
-detStruct <-
+detStruct_original <-
   lapply(behaviors,
          function(behav) {
   return(determinantStructure(behav,
                               list(behaviorRegEx = behav),
-                              determinantVar("intention",
-                                             "intention",
-                                             determinantVar("attitude",
-                                                            "att"),
-                                             determinantVar("perceivedNorm",
-                                                            "pn"),
-                                             determinantVar("perceivedBehavioralControl",
-                                                            "pbc"))));
+                              determinantVar("intention_original",
+                                             "_int\\w+",
+                                             determinantVar("attitude_original",
+                                                            "_att\\w+"),
+                                             determinantVar("perceivedNorm_original",
+                                                            "_pn\\w+"),
+                                             determinantVar("perceivedBehavioralControl_original",
+                                                            "_pbc\\w+"))));
+});
+
+detStruct_short <-
+  lapply(behaviors,
+         function(behav) {
+  return(determinantStructure(behav,
+                              list(behaviorRegEx = behav),
+                              determinantVar("intention_short",
+                                             "_intPlan",
+                                             determinantVar("attitude_short",
+                                                            "_attExperPleasant|_attInstrGood"),
+                                             determinantVar("perceivedNorm_short",
+                                                            "_pnInjunctiveApprove|_pnDescriptiveLikeMe"),
+                                             determinantVar("perceivedBehavioralControl_short",
+                                                            "_pbcCapacityConfidenc|_pbcControlUpToMe"))));
 });
 
 ```
@@ -244,256 +259,55 @@ dat <- dat.raw;
 
 ```
 
-# CIBERlite function definition
+# Analyses
 
-Note that this function, when done, will be integrated into the userfriendlyscience package.
-
-```{r}
-### Add variables names of the determinants' measures and compute
-### means where necessary
-for (i in seq_along(detStruct)) {
-  detStructAddVarNames(detStruct[[i]], names(dat));
-  dat <- detStructComputeScales(detStruct[[i]],
-                                dat);
-}
-
-### View means
-# lapply(dat[, grepl('attitude', names(dat))], mean, na.rm=TRUE);
-# lapply(dat[, grepl('perceivedNorm', names(dat))], mean, na.rm=TRUE);
-# lapply(dat[, grepl('perceivedBehavioralControl', names(dat))], mean, na.rm=TRUE);
-
-CIBERlite <- function(data,
-                      determinants,
-                      targets,
-                      determinantOrder = NULL,
-                      determinantLabels = NULL,
-                      subDeterminantLabels = NULL,
-                      title=NULL,
-                      conf.level = list(means = 0.9999,
-                                        associations = 0.95),
-                      scaleRange = NULL,
-                      determinantAesthetics = list(fill = 'black',
-                                                   color=NA,
-                                                   alpha=.5),
-                      subDeterminantAesthetics = list(fill = 'black',
-                                                      color=NA,
-                                                      alpha=.5),
-                      rDiamondAesthetics = list(fill = '#c4c4c4',
-                                                color=NA,
-                                                alpha=.75)) {
-
-  if (is.list(determinants)) {
-    subDeterminantNames <- unlist(determinants);
-    determinantNames <- names(determinants);
-  } else {
-    subDeterminantNames <- c();
-    determinantNames <- determinants;
-  }
-  if (is.null(determinantOrder)) {
-    determinantOrder <- seq_along(determinantNames);
-  }
-
-  if (getOption('ufs.debug', FALSE)) {
-    cat("\n", repStr("-", 50), "\n");
-    print(targets);
-    print(determinantNames);
-    print(subDeterminantNames);
-  }
-  
-  ### Select relevant rows from dataset
-  dat <- data[, c(targets, determinantNames, subDeterminantNames)];
-  
-  ### Set minimum and maximum for the used scales, if not provided
-  if (is.null(scaleRange)) {
-    scaleRange <- c(min(dat[, c(determinantNames, subDeterminantNames)], na.rm=TRUE),
-                    max(dat[, c(determinantNames, subDeterminantNames)], na.rm=TRUE));
-  }
-  
-  if (getOption('ufs.debug', FALSE)) {
-    cat("\n", repStr("-", 50), "\n");
-    print(determinantOrder);
-    print(scaleRange);
-  }
-  
-  # print(dim(is.na(dat[, c(determinantNames, subDeterminantNames)])));
-  # print((scaleRange[2] - scaleRange[1]));
-  # print(class(dim(((dat[, c(determinantNames, subDeterminantNames)] - scaleRange[1]) /
-  #             (scaleRange[2] - scaleRange[1])))));
-  
-  ### Translate subdeterminants and determinants to 0-1 range
-  dat[, c(determinantNames, subDeterminantNames)] <-
-    ((dat[, c(determinantNames, subDeterminantNames)] - scaleRange[1]) /
-              (scaleRange[2] - scaleRange[1]));
-  
-  if (is.list(determinants)) {
-    ### We also have subdeterminants, so also get the means for those.
-    
-    subDeterminantDat<- sapply(dat[, subDeterminantNames],
-                               function(x) {
-                                 return(c(mean = mean(x, na.rm=TRUE),
-                                          sd = sd(x, na.rm=TRUE)));
-                               }) %>% t %>% as.data.frame;
-    subDeterminantDat$subdeterminant <- row.names(subDeterminantDat);
-    subDeterminantDat$determinant <- rep(determinantNames,
-                                         sapply(determinants, length));
-    subDeterminantDat$xPos <- rep(determinantOrder,
-                                  sapply(determinants, length));
-  }
-
-  determinantDat <- sapply(dat[, determinantNames],
-                           function(x) {
-                             return(c(mean = mean(x, na.rm=TRUE),
-                                      sd = sd(x, na.rm=TRUE)));
-                           }) %>%
-    t %>%
-    as.data.frame;
-  determinantDat$determinant <- row.names(determinantDat);
-  determinantDat$xPos <- determinantOrder;
-  
-  determinantTargetCorObject <-
-    associationMatrix(dat,
-                      x = determinantNames,
-                      y = targets);
-  
-  determinantTarget.r <-
-    determinantTargetCorObject$output$raw$es;
-  determinantTarget.ci.lo <-
-    determinantTargetCorObject$output$raw$ci.lo;
-  determinantTarget.ci.hi <-
-    determinantTargetCorObject$output$raw$ci.hi;
-  
-  rDiamondCoordinates <-
-    lapply(1:length(targets), function(targetIndex) {
-      tmpDf <- cbind(determinantTargetCorObject$output$raw$ci.lo[, targetIndex],
-                                       determinantTargetCorObject$output$raw$es[, targetIndex],
-                                       determinantTargetCorObject$output$raw$ci.hi[, targetIndex]);
-      return(lapply(1:nrow(tmpDf),
-                    function(determinantIndex) {
-                      return(diamondCoordinates(tmpDf[determinantIndex, ],
-                                                otherAxisValue = determinantIndex));
-                    }));
-     });
-  
-  rDiamondLayer <- 
-    lapply(1:length(targets), function(targetIndex) {
-      tmpDf <-
-        cbind(determinantTargetCorObject$output$raw$ci.lo[, targetIndex],
-              determinantTargetCorObject$output$raw$es[, targetIndex],
-              determinantTargetCorObject$output$raw$ci.hi[, targetIndex]) %>%
-        as.data.frame;
-      return(ggDiamondLayer(tmpDf,
-                            direction="vertical",
-                            color=rDiamondAesthetics$fill,
-                            lineColor=rDiamondAesthetics$color,
-                            alpha=rDiamondAesthetics$alpha));
-     });
-
-  if (getOption('ufs.debug', FALSE)) {
-    cat("\n", repStr("-", 50), "\n");
-    print(determinantDat);
-    cat("\n", repStr("-", 50), "\n");
-    print(subDeterminantDat);
-    cat("\n", repStr("-", 50), "\n");
-    print(rDiamondCoordinates);
-    cat("\n", repStr("-", 50), "\n");
-  }
-  
-  if (is.null(determinantLabels)) {
-    determinantLabels <- determinantNames;
-  }
-  if (is.null(subDeterminantLabels)) {
-    subDeterminantLabels <- subDeterminantNames;
-  }
-
-  ggplot() +
-    geom_hline(yintercept = c(0, 1),
-               color="black") +
-    geom_bar(data = subDeterminantDat,
-             aes_string(x = 'xPos',
-                        y = 'mean',
-                        group = 'subdeterminant'),
-             stat='identity',
-             position='dodge',
-             fill=subDeterminantAesthetics$fill,
-             color=subDeterminantAesthetics$color,
-             alpha=subDeterminantAesthetics$alpha) +
-    geom_bar(data = determinantDat,
-             aes_string(x = 'xPos',
-                        y = 'mean'),
-             stat='identity',
-             position='identity',
-             fill=determinantAesthetics$fill,
-             color=determinantAesthetics$color,
-             alpha=determinantAesthetics$alpha) +
-    rDiamondLayer +
-    theme_minimal() +
-    coord_cartesian(ylim=c(0,1)) +
-    scale_x_continuous(breaks=determinantOrder,
-                       labels=determinantLabels,
-                       sec.axis=dup_axis(breaks=c(determinantOrder-.25,
-                                                  determinantOrder+.25),
-                                         labels=c(subDeterminantLabels[is.odd(seq_along(subDeterminantLabels))],
-                                                  subDeterminantLabels[is.even(seq_along(subDeterminantLabels))]))) +
-    ggtitle(title) +
-    xlab(NULL) +
-    ylab(NULL);
-}
-
-```
-
-# CIBERlite plots
+The aim of this study is to explore the convergent validity of the brief direct measures of the four main constructs as defined in the Reasoned Action Approach: intention, attitude, perceived norms and perceived behavioral control. To this end we compute the correlation coefficients of the original and the brief measures.
 
 ```{r results="asis"}
 
-### Set plot titles by adding expectations regarding determinant values
-plotSubTitles <- c(coffee = "Not drinking any coffee at all\n(Att: lo, PN: lo, PBC: lo)",
-                   publicTransport = "Mainly traveling by public transport\n(Att: lo, PN: hi, PBC: lo)",
-                   runRedLight = "Sometimes running a red light (by bike)\n(Att: lo, PN: lo, PBC: hi)",
-                   wasteSeparation = "Always carefully separating waste\n(Att: lo, PN: hi, PBC: hi)",
-                   conSomebody = "Con somebody for 10.000 euro\n(Att: hi, PN: lo, PBC: lo)",
-                   marathon = "Finish a marathon\n(Att: hi, PN: hi, PBC: lo)",
-                   longShower = "Often take extra long showers\n(Att: hi, PN: lo, PBC: hi)",
-                   brushingTeeth = "Brush your teeth every day\n(Att: hi, PN: hi, PBC: hi)");
+### Add variables names of the determinants' measures and compute
+### means where necessary
 
-CIBERlitePlots <- lapply(seq_along(detStruct),
-                         function(i) {
-                           behaviorName <- detStruct[[i]]$behaviorRegEx;
-                           detStructVars <-
-                             detStruct[[i]]$Get('varNames', filterFun=isLeaf);
-                           ### Set name to variable name of overarching determinant
-                           names(detStructVars) <-
-                             detStruct[[i]]$Get("scaleVarName", filterFun=isLeaf);
-                           return(CIBERlite(dat,
-                                            determinants=detStructVars,
-                                            determinantLabels=c('Att', 'PN', 'PBC'),
-                                            subDeterminantLabels=c("Exp", "Ins", "Inj", "Des", "Cap", "Con"),
-                                            scaleRange=c(1,5),
-                                            targets=detStruct[[i]]$intention$scaleVarName) +
-                                    ggtitle(behaviorName,
-                                            subtitle = plotSubTitles[behaviorName]) +
-                                    theme(plot.subtitle=element_text(size=8)));
-                         });
+### Original measures
+for (i in seq_along(detStruct_original)) {
+  detStructAddVarNames(detStruct_original[[i]], names(dat));
+  dat <- detStructComputeScales(detStruct_original[[i]],
+                                dat);
+}
 
-combinedCIBERlitePlot <- arrangeGrob(grobs=CIBERlitePlots, ncol=4);
+### Short measures
+for (i in seq_along(detStruct_short)) {
+  detStructAddVarNames(detStruct_short[[i]], names(dat));
+  dat <- detStructComputeScales(detStruct_short[[i]],
+                                dat);
+}
 
-knitFig(combinedCIBERlitePlot,
-        figWidth=21/2.54,
-        figHeight=14/2.54,
-        figCaption="Figure 1: a CIBER plot. Note that in their operationalitions, all these behaviors related to the next month (... for the next month, ... in the next month, etc).<br />Att = Attitude, PN = Perceived Norm, PBC = Perceived Behavioral Control, Exp = Experiential Attitude, Ins = Instrumental Attitude, Inj = Injunctive Norm, Des = Descriptive Norm, Cap = Capacity, Con = Control.");
+### Loop through behaviors
+for (i in seq_along(behaviors)) {
+  cat0("\n\n## ", behaviors[i], "\n\n");
 
-ggsave(plot = combinedCIBERlitePlot,
-       file = file.path(outputPath,
-                        "Figure-1.png"),
-       dpi=300,
-       width=21,
-       height=14,
-       units="cm");
+  cat0("\n\n### Intention\n\n");
+  
+  cor.test(dat[, detStruct_original[[i]]$intention_original$scaleVarName],
+           dat[, detStruct_short[[i]]$intention_short$scaleVarName])$conf.int;
 
-```
+  cat0("\n\n### Attitude\n\n");
+  
+  cor.test(dat[, detStruct_original[[i]]$intention_original$attitude_original$scaleVarName],
+           dat[, detStruct_short[[i]]$intention_short$attitude_short$scaleVarName])$conf.int;
 
-# Correlation between the two sub-determinants
+  cat0("\n\n### Perceived Norms\n\n");
+  
+  cor.test(dat[, detStruct_original[[i]]$intention_original$perceivedNorms_original$scaleVarName],
+           dat[, detStruct_short[[i]]$intention_short$perceivedNorms_short$scaleVarName])$conf.int;
 
-```{r}
-cor(dat[, unlist(detStruct[[1]]$intention$perceivedNorm$varNames)], use='complete');
+  cat0("\n\n### Perceived Behavioral Control\n\n");
+  
+  cor.test(dat[, detStruct_original[[i]]$intention_original$perceivedBehavioralControl_original$scaleVarName],
+           dat[, detStruct_short[[i]]$intention_short$perceivedBehavioralControl_short$scaleVarName])$conf.int;
+
+}
 
 ```
+
+
