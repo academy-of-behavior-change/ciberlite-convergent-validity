@@ -33,5 +33,5 @@ vignettes/*.pdf
 *.knit.md
 .Rproj.user
 
-### Exclide private files
-*_[PRIVATE-version]*.*
+### Exclude private files
+/results-data-raw/*_[PRIVATE-version].*
