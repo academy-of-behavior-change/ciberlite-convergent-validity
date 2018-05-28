@@ -1,1 +1,3 @@
-# ciberlite-convergent-validity
+# CIBERlite: convergent validity
+
+This project is a part of a wider effort aiming to provide an easy-to-use and apply rudimentary approximation of a determinant study, so that practitioners (e.g. for preventions organisations) can feasibly quickly get an idea of which determinants are the most relevant in predicting a given target behavior in a given target population. To develop this method, we explore the convergent validity of the short direct measures of the Reasoned Action Approach constructs (compared to the original measures). This project is at the Open Science Framework at https://osf.io/pemfz.
