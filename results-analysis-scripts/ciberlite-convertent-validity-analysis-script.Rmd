@@ -23,7 +23,7 @@ CIBERlite is a project where we aim to provide an easy-to-use and apply rudiment
 
 A second goal of CIBERlite, but only one that only emerged as we were working on this project, is to work towards a framework for calibrating determinant operationalisations over behaviors and populations.
 
-The preregistration form for this study is at https://osf.io/pemfz/register/[[[ADD-THIS!!!]]]. That is a good place to start before reading further.
+The preregistration form for this study is at https://osf.io/pemfz/register/hvkzr. That is a good place to start before reading further.
 
 ## License of these materials
 
