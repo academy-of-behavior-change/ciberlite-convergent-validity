@@ -34,4 +34,4 @@ vignettes/*.pdf
 .Rproj.user
 
 ### Exclude private files
-*_\[PRIVATE-version\].csv
+*_\[PRIVATE-version].csv
