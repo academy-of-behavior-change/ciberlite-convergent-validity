@@ -284,27 +284,27 @@ for (i in seq_along(detStruct_short)) {
 
 ### Loop through behaviors
 for (i in seq_along(behaviors)) {
-  cat0("\n\n## ", behaviors[i], "\n\n");
+  cat0("\n\n## ", behaviors[i], "\n");
 
-  cat0("\n\n### Intention\n\n");
+  cat0("\n- **Intention**: ",
+       formatCI(cor.test(dat[, detStruct_original[[i]]$intention_original$scaleVarName],
+                         dat[, detStruct_short[[i]]$intention_short$scaleVarName])$conf.int,
+                noZero=TRUE));
   
-  cor.test(dat[, detStruct_original[[i]]$intention_original$scaleVarName],
-           dat[, detStruct_short[[i]]$intention_short$scaleVarName])$conf.int;
+    cat0("\n- **Attitude**: ",
+       formatCI(cor.test(dat[, detStruct_original[[i]]$intention_original$attitude_original$scaleVarName],
+                         dat[, detStruct_short[[i]]$intention_short$attitude_short$scaleVarName])$conf.int,
+                noZero=TRUE));
 
-  cat0("\n\n### Attitude\n\n");
-  
-  cor.test(dat[, detStruct_original[[i]]$intention_original$attitude_original$scaleVarName],
-           dat[, detStruct_short[[i]]$intention_short$attitude_short$scaleVarName])$conf.int;
+    cat0("\n- **Perceived norm**: ",
+       formatCI(cor.test(dat[, detStruct_original[[i]]$intention_original$perceivedNorm_original$scaleVarName],
+                         dat[, detStruct_short[[i]]$intention_short$perceivedNorm_short$scaleVarName])$conf.int,
+                noZero=TRUE));
 
-  cat0("\n\n### Perceived Norms\n\n");
-  
-  cor.test(dat[, detStruct_original[[i]]$intention_original$perceivedNorms_original$scaleVarName],
-           dat[, detStruct_short[[i]]$intention_short$perceivedNorms_short$scaleVarName])$conf.int;
-
-  cat0("\n\n### Perceived Behavioral Control\n\n");
-  
-  cor.test(dat[, detStruct_original[[i]]$intention_original$perceivedBehavioralControl_original$scaleVarName],
-           dat[, detStruct_short[[i]]$intention_short$perceivedBehavioralControl_short$scaleVarName])$conf.int;
+    cat0("\n- **Perceived behavioral control**: ",
+       formatCI(cor.test(dat[, detStruct_original[[i]]$intention_original$perceivedBehavioralControl_original$scaleVarName],
+                         dat[, detStruct_short[[i]]$intention_short$perceivedBehavioralControl_short$scaleVarName])$conf.int,
+                noZero=TRUE));
 
 }
 
