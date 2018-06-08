@@ -44,6 +44,7 @@ safeRequire('data.tree');
 safeRequire('tidyverse');
 safeRequire('gridExtra');
 safeRequire('readODS');
+safeRequire('pander');
 
 dataPath <- here::here('results-data-raw');
 processedDataPath <- here::here('results-data-processed');
@@ -287,33 +288,33 @@ dat$urbanisation[dat$country != "Nederland"] <- NA;
 
 # Sample description
 
-The dataset (after sanitization) has `nrow(dat)` rows. `sum(!is.na(dat$submitdate))` rows submitted the complete survey (i.e. have a non-missing value for `submitdate`). Note that providing demographic data was optional, so less data may be available for the demographic variables (age, sex, education, country, and region).
+The dataset (after sanitization) has `r nrow(dat)` rows. `r sum(!is.na(dat$submitdate))` rows submitted the complete survey (i.e. have a non-missing value for `submitdate`). Note that providing demographic data was optional, so less data may be available for the demographic variables (age, sex, education, country, and region).
 
 ## Age
 
 ```{r}
-  descr(dat$age);
+  pander(descr(dat$age));
   powerHist(dat$age);
 ```
 
 ## Sex
 
 ```{r}
-  descr(dat$sex);
+  pander(descr(dat$sex));
   ggEasyBar(dat, 'sex');
 ```
 
 ## Education
 
 ```{r}
-  descr(dat$education);
+  pander(descr(dat$education));
   ggEasyBar(dat, 'education');
 ```
 
 ## Country
 
 ```{r}
-  descr(dat$country);
+  pander(descr(dat$country));
 ```
 
 ## Region
@@ -321,7 +322,7 @@ The dataset (after sanitization) has `nrow(dat)` rows. `sum(!is.na(dat$submitdat
 We registered the first two numbers of each participant's postcode. For Dutch participants, these were used to compute whether they lived in a rural or urban area.
 
 ```{r}
-  descr(dat$urbanisation);
+  pander(descr(dat$urbanisation));
 ```
 
 # Analyses
@@ -348,29 +349,25 @@ for (i in seq_along(detStruct_short)) {
 }
 
 ### Loop through behaviors
+corTestObjects <- list();
+determinants <- c("intention", "attitude", "perceivedNorm", "perceivedBehavioralControl");
 for (i in seq_along(behaviors)) {
   cat0("\n\n## ", behaviors[i], "\n");
 
-  cat0("\n- **Intention**: ",
-       formatCI(cor.test(dat[, detStruct_original[[i]]$intention_original$scaleVarName],
-                         dat[, detStruct_short[[i]]$intention_short$scaleVarName])$conf.int,
-                noZero=TRUE));
+  corTestObjects[[behaviors[i]]] <-
+    lapply(determinants,
+           function(v) {
+             return(cor.test(dat[, FindNode(detStruct_original[[i]], paste0(v, "_original"))$scaleVarName],
+                             dat[, FindNode(detStruct_short[[i]], paste0(v, "_short"))$scaleVarName]))
+           });
+
+  names(corTestObjects[[behaviors[i]]]) <- determinants;
   
-    cat0("\n- **Attitude**: ",
-       formatCI(cor.test(dat[, detStruct_original[[i]]$intention_original$attitude_original$scaleVarName],
-                         dat[, detStruct_short[[i]]$intention_short$attitude_short$scaleVarName])$conf.int,
-                noZero=TRUE));
-
-    cat0("\n- **Perceived norm**: ",
-       formatCI(cor.test(dat[, detStruct_original[[i]]$intention_original$perceivedNorm_original$scaleVarName],
-                         dat[, detStruct_short[[i]]$intention_short$perceivedNorm_short$scaleVarName])$conf.int,
-                noZero=TRUE));
-
-    cat0("\n- **Perceived behavioral control**: ",
-       formatCI(cor.test(dat[, detStruct_original[[i]]$intention_original$perceivedBehavioralControl_original$scaleVarName],
-                         dat[, detStruct_short[[i]]$intention_short$perceivedBehavioralControl_short$scaleVarName])$conf.int,
-                noZero=TRUE));
-
+  for (j in names(corTestObjects[[behaviors[i]]])) {
+  cat0("\n- **", j, "**: ",
+       formatCI(corTestObjects[[behaviors[i]]][[j]]$conf.int, noZero=TRUE),
+       ", point estimate = ", formatR(corTestObjects[[behaviors[i]]][[j]]$estimate));
+    }
 }
 
 ```
