@@ -35,16 +35,39 @@ Here, we configure some settings and load the required R packages.
 
 ```{r setup}
 
-knitr::opts_chunk$set(echo = TRUE);
-options(ufs.debug = FALSE);
+########################################################################
+### Packages
+########################################################################
 
-require('userfriendlyscience');
+if (!require('userfriendlyscience', quietly = FALSE)) {
+  stop("You need to have the userfriendlyscience package installed!");
+}
 safeRequire('here');
+safeRequire('knitr');
+safeRequire('pander');
 safeRequire('data.tree');
 safeRequire('tidyverse');
 safeRequire('gridExtra');
 safeRequire('readODS');
-safeRequire('pander');
+
+########################################################################
+### Settings
+########################################################################
+
+knitr::opts_chunk$set(echo=FALSE);
+knitr::opts_chunk$set(cache=FALSE);
+knitr::opts_chunk$set(comment=NA);
+
+options(width = 160);
+options(xtable.type = "html");
+panderOptions('knitr.auto.asis', FALSE);
+panderOptions('table.split.table', Inf);
+
+options(ufs.debug = FALSE);
+
+########################################################################
+### Set the variables with the paths and filenames
+########################################################################
 
 dataPath <- here::here('results-data-raw');
 processedDataPath <- here::here('results-data-processed');
@@ -53,6 +76,10 @@ outputPath <- here::here('results-output');
 privateDataFileRegEx <- 'survey_797479_R_data_file_\\[PRIVATE-version]';
 publicDataFileRegEx <- 'survey_797479_R_data_file_\\[PUBLIC-version]';
 dataLoadScriptName <- 'survey_797479_R_syntax_file.R';
+
+########################################################################
+### Configure dataset characteristics
+########################################################################
 
 categoricalQuestions <- c('sex',
                           'education',
@@ -65,13 +92,12 @@ privateFileIdentificationString <- "PRIVATE-";
 publicFileIdentificationString <- "PUBLIC-";
 
 ### These are the behaviors in this study
-
 behaviors <- c("alcohol", "coffee", "smoking",
                "exercise", "marathon");
 
-###############################################################################
-### General settings
-###############################################################################
+########################################################################
+### Specific function and variable definitions
+########################################################################
 
 ### Load spatial and inhabitation density data for postcodes
 pcDat <- data.frame(postcode =  c(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99),
@@ -350,24 +376,83 @@ for (i in seq_along(detStruct_short)) {
 
 ### Loop through behaviors
 corTestObjects <- list();
+corMatrixObjects_full <- list();
+corMatrixObjects_lean <- list();
 determinants <- c("intention", "attitude", "perceivedNorm", "perceivedBehavioralControl");
 for (i in seq_along(behaviors)) {
+
+  ### Title for this behavior
   cat0("\n\n## ", behaviors[i], "\n");
 
+  ### Correlation between short and long versions
   corTestObjects[[behaviors[i]]] <-
     lapply(determinants,
            function(v) {
-             return(cor.test(dat[, FindNode(detStruct_original[[i]], paste0(v, "_original"))$scaleVarName],
-                             dat[, FindNode(detStruct_short[[i]], paste0(v, "_short"))$scaleVarName]))
+             return(cor.test(dat[, FindNode(detStruct_original[[i]],
+                                            paste0(v, "_original"))$scaleVarName],
+                             dat[, FindNode(detStruct_short[[i]],
+                                            paste0(v, "_short"))$scaleVarName]))
            });
-
   names(corTestObjects[[behaviors[i]]]) <- determinants;
+
+  ### Correlations between lean measures for this behavior
+  fullVarNames <- detStruct_original[[i]]$Get('scaleVarName')
+  fullVarNames <- fullVarNames[!is.na(fullVarNames)];
+  corMatrixObjects_full[[behaviors[i]]] <-
+    associationMatrix(dat, x = fullVarNames);
   
+  ### Correlations between lean measures for this behavior
+  leanVarNames <- detStruct_short[[i]]$Get('scaleVarName')
+  leanVarNames <- leanVarNames[!is.na(leanVarNames)];
+  corMatrixObjects_lean[[behaviors[i]]] <-
+    associationMatrix(dat, x = leanVarNames);
+
+  cat0("\n### Correlations between full and lean operationalisations\n\n");
   for (j in names(corTestObjects[[behaviors[i]]])) {
   cat0("\n- **", j, "**: ",
        formatCI(corTestObjects[[behaviors[i]]][[j]]$conf.int, noZero=TRUE),
-       ", point estimate = ", formatR(corTestObjects[[behaviors[i]]][[j]]$estimate));
-    }
+       ", point estimate = ", formatR(corTestObjects[[behaviors[i]]][[j]]$estimate),
+       ", n = ", corTestObjects[[behaviors[i]]][[j]]$parameter + 2);
+  }
+
+  cat0("\n### Correlation matrices using full operationalisations\n\n");
+
+  sampleSize_full <- as.numeric(corMatrixObjects_full[[behaviors[i]]]$output$raw$n);
+  sampleSize_full <- unique(sampleSize_full);
+  sampleSize_full <- sampleSize_full[!is.na(sampleSize_full)];
+  cat0("\n\nSample size = ", sampleSize_full, "\n\n");
+  pander(corMatrixObjects_full[[behaviors[i]]]);
+  
+  cat0("\n### Correlations matrices using lean operationalisations\n\n");
+
+  sampleSize_lean <- as.numeric(corMatrixObjects_lean[[behaviors[i]]]$output$raw$n);
+  sampleSize_lean <- unique(sampleSize_lean);
+  sampleSize_lean <- sampleSize_lean[!is.na(sampleSize_lean)];
+  cat0("\n\nSample size = ", sampleSize_lean, "\n\n");
+  pander(corMatrixObjects_lean[[behaviors[i]]]);
+  
+  cat0("\n### Q (effect size for difference between correlations)\n\n");
+  
+  fullZ <- convert.r.to.fisherz(corMatrixObjects_full[[i]]$output$raw$es);
+  leanZ <- convert.r.to.fisherz(corMatrixObjects_lean[[i]]$output$raw$es);
+  diffQ <- fullZ - leanZ;
+  ZforQ <- diffQ / sqrt((1 / (sampleSize_full - 3)) +
+                        (1 / (sampleSize_lean - 3)));
+  pforQ <- 2*ifelse(ZforQ < 0, pnorm(ZforQ), 1-pnorm(ZforQ));
+  
+  qMatrix <- paste0("q=", formatR(diffQ), "\n",
+                    formatPvalue(pforQ));
+  qMatrix <- ifelse(grepl("NA", qMatrix),
+                    "",
+                    qMatrix);
+  qMatrix <- matrix(qMatrix,
+                    ncol=ncol(fullZ));
+
+  rownames(qMatrix) <- determinants;
+  colnames(qMatrix) <- determinants;
+
+  pander(qMatrix);
+  
 }
 
 ```
