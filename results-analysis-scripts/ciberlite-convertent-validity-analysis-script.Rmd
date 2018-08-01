@@ -5,6 +5,8 @@ date: "`r format(Sys.time(), '%H:%M:%S on %Y-%m-%d %Z (GMT%z)')`"
 output:
   html_document:
     toc: true
+editor_options: 
+  chunk_output_type: console
 ---
 
 # Introduction
@@ -453,6 +455,7 @@ for (i in seq_along(behaviors)) {
 
   pander(qMatrix);
   
+  ### Note - we may have to correct this, see https://twitter.com/matherion/status/1012705305237442562
 }
 
 ```
