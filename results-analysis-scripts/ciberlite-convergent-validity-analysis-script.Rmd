@@ -417,7 +417,7 @@ for (i in seq_along(behaviors)) {
        ", n = ", corTestObjects[[behaviors[i]]][[j]]$parameter + 2);
   }
 
-  cat0("\n### Correlation matrices using full operationalisations\n\n");
+  cat0("\n\n\n### Correlation matrices using full operationalisations\n\n");
 
   sampleSize_full <- as.numeric(corMatrixObjects_full[[behaviors[i]]]$output$raw$n);
   sampleSize_full <- unique(sampleSize_full);

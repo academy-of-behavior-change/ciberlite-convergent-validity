@@ -519,8 +519,8 @@ data[, 107] <- as.numeric(data[, 107])
 attributes(data)$variable.labels[107] <- "Wat is de hoogste opleiding die u heeft afgerond of nu volgt?"
 data[, 107] <- factor(data[, 107], levels=c(1,2,3,4,5,6),labels=c("Basisonderwijs", "VMBO (bijvoorbeeld praktijkonderwijs)", "HAVO / VWO", "MBO (bijvoorbeeld een ROC)", "HBO", "WO (bijvoorbeeld een MSc of PhD)"))
 names(data)[107] <- "education"
-# LimeSurvey Field type: F
-data[, 108] <- as.numeric(data[, 108])
+# LimeSurvey Field type: A
+data[, 108] <- as.character(data[, 108])
 attributes(data)$variable.labels[108] <- "[Andere] Wat is de hoogste opleiding die u heeft afgerond of nu volgt?"
 names(data)[108] <- "education_other"
 # LimeSurvey Field type: F
@@ -532,8 +532,8 @@ names(data)[109] <- "country"
 data[, 110] <- as.numeric(data[, 110])
 attributes(data)$variable.labels[110] <- "Wat zijn de eerste twee cijfers van uw postcode?"
 names(data)[110] <- "region"
-# LimeSurvey Field type: F
-data[, 111] <- as.numeric(data[, 111])
+# LimeSurvey Field type: A
+data[, 111] <- as.character(data[, 111])
 attributes(data)$variable.labels[111] <- "Als u wilt, kunt u hier uw onderzoekscode invoeren. Dat maakt het mogelijk om uw data te koppelen over vragenlijsten. Bovendien kunt u hiermee uw eigen data terugvinden als u dat wilt, zonder dat uw anonimiteit wordt aangetast.	U kunt uw onderzoekscode genereren op https://onderzoekscode.nl. Met deze code van 6 tekens (2 letters, 2 cijfers, 2 letters) blijft u anoniem: hij is alleen te genereren op basis van uw persoonlijke informatie, en zelfs als iemand die bemachtigt en daarmee uw onderzoekscode genereert, dan is nog steeds niet zeker dat de antwoorden in de vragenlijst de uwe zijn, omdat verschillende combinaties van persoonlijke gegevens tot dezelfde onderzoekscode kunnen leiden."
 names(data)[111] <- "researchCode"
 # LimeSurvey Field type: F
