@@ -381,6 +381,7 @@ corTestObjects <- list();
 corMatrixObjects_full <- list();
 corMatrixObjects_lean <- list();
 determinants <- c("intention", "attitude", "perceivedNorm", "perceivedBehavioralControl");
+all_p_values <- c();
 for (i in seq_along(behaviors)) {
 
   ### Title for this behavior
@@ -455,8 +456,20 @@ for (i in seq_along(behaviors)) {
 
   pander(qMatrix);
   
+  all_p_values <- c(all_p_values, pforQ[!is.na(pforQ)]);
+  
   ### Note - we may have to correct this, see https://twitter.com/matherion/status/1012705305237442562
 }
+
+
+```
+
+## Distribution of *p* values for correlation comparisons
+
+```{r}
+
+hist(all_p_values);
+ks.test(all_p_values, punif);
 
 ```
 
