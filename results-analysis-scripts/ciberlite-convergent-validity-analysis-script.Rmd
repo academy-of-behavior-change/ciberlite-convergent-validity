@@ -41,8 +41,8 @@ Here, we configure some settings and load the required R packages.
 ### Packages
 ########################################################################
 
-if (!require('userfriendlyscience', quietly = FALSE)) {
-  stop("You need to have the userfriendlyscience package installed!");
+if (!require('ufs', quietly = FALSE)) {
+  stop("You need to have the `ufs` package installed!");
 }
 safeRequire('here');
 safeRequire('knitr');
@@ -51,6 +51,7 @@ safeRequire('data.tree');
 safeRequire('tidyverse');
 safeRequire('gridExtra');
 safeRequire('readODS');
+safeRequire('userfriendlyscience');
 
 ########################################################################
 ### Settings
