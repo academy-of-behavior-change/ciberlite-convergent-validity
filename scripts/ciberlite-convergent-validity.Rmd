@@ -1,7 +1,7 @@
 ---
 title: "CIBERlite: convergent validity"
 author: "Gjalt-Jorn Peters & Rik Crutzen"
-date: "`r format(Sys.time(), '%H:%M:%S on %Y-%m-%d %Z (GMT%z)')`"
+date: "`r format(Sys.time(), '%H:%M:%S on %Y-%m-%d %Z (UTC%z)')`"
 output:
   html_document:
     toc: true
@@ -44,14 +44,14 @@ Here, we configure some settings and load the required R packages.
 if (!require('ufs', quietly = FALSE)) {
   stop("You need to have the `ufs` package installed!");
 }
-safeRequire('here');
-safeRequire('knitr');
-safeRequire('pander');
-safeRequire('data.tree');
-safeRequire('tidyverse');
-safeRequire('gridExtra');
-safeRequire('readODS');
-safeRequire('userfriendlyscience');
+ufs::safeRequire('here');
+ufs::safeRequire('knitr');
+ufs::safeRequire('pander');
+ufs::safeRequire('data.tree');
+ufs::safeRequire('tidyverse');
+ufs::safeRequire('gridExtra');
+ufs::safeRequire('readODS');
+ufs::safeRequire('userfriendlyscience');
 
 ########################################################################
 ### Settings
@@ -319,42 +319,175 @@ dat$urbanisation[dat$country != "Nederland"] <- NA;
 
 The dataset (after sanitization) has `r nrow(dat)` rows. `r sum(!is.na(dat$submitdate))` rows submitted the complete survey (i.e. have a non-missing value for `submitdate`). Note that providing demographic data was optional, so less data may be available for the demographic variables (age, sex, education, country, and region).
 
-## Age
-
 ```{r}
-  pander(descr(dat$age));
-  powerHist(dat$age);
-```
 
-## Sex
+dat$duration_minutes <- dat$Totaaltijd/60;
 
-```{r}
-  pander(descr(dat$sex));
-  ggEasyBar(dat, 'sex');
-```
+rosetta::descr(
+  dat,
+  items = c(
+    'age',
+    'sex',
+    'education',
+    'country',
+    'urbanisation',
+    'duration_minutes'
+  ),
+  histogram = TRUE
+);
 
-## Education
-
-```{r}
-  pander(descr(dat$education));
-  ggEasyBar(dat, 'education');
-```
-
-## Country
-
-```{r}
-  pander(descr(dat$country));
-```
-
-## Region
-
-We registered the first two numbers of each participant's postcode. For Dutch participants, these were used to compute whether they lived in a rural or urban area.
-
-```{r}
-  pander(descr(dat$urbanisation));
 ```
 
 # Analyses
+
+## Validity and internal consistency: full measurement instruments {.tabset .tabset-pills}
+
+```{r validity-and-internal-consistency-full, results="asis"}
+
+for (i in seq_along(behaviors)) {
+  ufs::heading("Behavior: ", behaviors[i], headingLevel = 3);
+  
+  intention_varName <-
+    names(detStruct_original[[i]]$children);
+  determinant_varNames <-
+    names(detStruct_original[[i]][[intention_varName]]$children);
+  
+  currentVarNames <-
+    grep(paste0(
+      behaviors[i],
+      detStruct_original[[i]][[intention_varName]]$selection),
+      names(dat), value=TRUE);
+  
+  ufs::heading("Intention", headingLevel = 4);
+  
+  cat("\n\nEigenvalues:",
+      vecTxt(round(eigen(cor(dat[, currentVarNames],
+                             use='complete.obs'))$values, 2)),
+      "\n\n");
+  
+  print(rosetta::rosettaReliability_partial(
+    rosetta::reliability(
+      data = dat,
+      items = currentVarNames,
+      scatterMatrix = TRUE,
+      headingLevel = 5
+    )
+  ));
+
+  for (j in determinant_varNames) {
+    
+    ufs::heading(j, headingLevel = 4);
+    
+    currentVarNames <-
+      grep(paste0(
+        behaviors[i],
+        detStruct_original[[i]][[intention_varName]][[j]]$selection),
+        names(dat), value=TRUE);
+        
+    cat("\n\nEigenvalues: ",
+        vecTxt(round(eigen(cor(dat[, currentVarNames],
+                               use='complete.obs'))$values, 2)),
+        "\n\n");
+    
+    print(rosetta::rosettaReliability_partial(
+      rosetta::reliability(
+        data = dat,
+        items = currentVarNames,
+        scatterMatrix = TRUE,
+        headingLevel = 5
+      )
+    ));
+  }
+  
+}
+
+```
+
+## Validity and internal consistency: brief measurement instruments, subset of long {.tabset .tabset-pills}
+
+```{r validity-and-internal-consistency-brief-subset, results="asis"}
+
+for (i in seq_along(behaviors)) {
+  ufs::heading("Behavior: ", behaviors[i], headingLevel = 3);
+  
+  intention_varName <-
+    names(detStruct_short[[i]]$children);
+  determinant_varNames <-
+    names(detStruct_short[[i]][[intention_varName]]$children);
+  
+  for (j in determinant_varNames) {
+    
+    ufs::heading(j, headingLevel = 4);
+    
+    currentVarNames <-
+      grep(paste0(
+        behaviors[i],
+        detStruct_short[[i]][[intention_varName]][[j]]$selection),
+        names(dat), value=TRUE);
+
+    cat("\n\nEigenvalues: ",
+        vecTxt(round(eigen(cor(dat[dat[, paste0(behaviors[i], "Version")] == "long",
+                               currentVarNames],
+                               use='complete.obs'))$values, 2)),
+        "\n\n");
+    
+    print(rosetta::rosettaReliability_partial(
+      rosetta::reliability(
+        data = dat[dat[paste0(behaviors[i], "Version")] == "long", ],
+        items = currentVarNames,
+        scatterMatrix = TRUE,
+        headingLevel = 5
+      )
+    ));
+  }
+  
+}
+
+```
+
+## Validity and internal consistency: brief measurement instruments, isolated {.tabset .tabset-pills}
+
+```{r validity-and-internal-consistency-brief-isolated, results="asis"}
+
+for (i in seq_along(behaviors)) {
+  ufs::heading("Behavior: ", behaviors[i], headingLevel = 3);
+  
+  intention_varName <-
+    names(detStruct_short[[i]]$children);
+  determinant_varNames <-
+    names(detStruct_short[[i]][[intention_varName]]$children);
+  
+  for (j in determinant_varNames) {
+    
+    ufs::heading(j, headingLevel = 4);
+    
+    currentVarNames <-
+      grep(paste0(
+        behaviors[i],
+        detStruct_short[[i]][[intention_varName]][[j]]$selection),
+        names(dat), value=TRUE);
+
+    cat("\n\nEigenvalues: ",
+        vecTxt(round(eigen(cor(dat[dat[paste0(behaviors[i], "Version")] == "short",
+                               currentVarNames],
+                               use='complete.obs'))$values, 2)),
+        "\n\n");
+    
+    print(rosetta::rosettaReliability_partial(
+      rosetta::reliability(
+        data = dat[dat[, paste0(behaviors[i], "Version")] == "short", ],
+        items = currentVarNames,
+        scatterMatrix = TRUE,
+        headingLevel = 5
+      )
+    ));
+  }
+  
+}
+
+```
+
+## Main results
 
 The aim of this study is to explore the convergent validity of the brief direct measures of the four main constructs as defined in the Reasoned Action Approach: intention, attitude, perceived norms and perceived behavioral control. To this end we compute the correlation coefficients of the original and the brief measures.
 
