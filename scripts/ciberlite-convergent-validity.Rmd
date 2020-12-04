@@ -41,32 +41,36 @@ Here, we configure some settings and load the required R packages.
 ### Packages
 ########################################################################
 
-if (!require('ufs', quietly = FALSE)) {
-  stop("You need to have the `ufs` package installed!");
+if (!(installed.packages()['ufs', 'Version'] >= "0.4")) {
+  stop("You need to have at least version 0.4 of the `ufs` package installed; ",
+       "install it with:\n\ninstall.packages('ufs');");
 }
-ufs::safeRequire('here');
-ufs::safeRequire('knitr');
-ufs::safeRequire('pander');
-ufs::safeRequire('data.tree');
-ufs::safeRequire('tidyverse');
-ufs::safeRequire('gridExtra');
-ufs::safeRequire('readODS');
-ufs::safeRequire('userfriendlyscience');
+
+ufs::checkPkgs(
+  'here',
+  'knitr',
+  'kableExtra',
+  'pander',
+  'data.tree',
+  'tidyverse',
+  'gridExtra',
+  'readODS',
+  'userfriendlyscience'
+);
 
 ########################################################################
 ### Settings
 ########################################################################
 
+ufs::opts$set(debug = FALSE);
 knitr::opts_chunk$set(echo=FALSE);
 knitr::opts_chunk$set(cache=FALSE);
 knitr::opts_chunk$set(comment=NA);
 
 options(width = 160);
 options(xtable.type = "html");
-panderOptions('knitr.auto.asis', FALSE);
-panderOptions('table.split.table', Inf);
-
-options(ufs.debug = FALSE);
+pander::panderOptions('knitr.auto.asis', FALSE);
+pander::panderOptions('table.split.table', Inf);
 
 ########################################################################
 ### Set the variables with the paths and filenames
@@ -136,34 +140,60 @@ This command builds the determinant structures that we will analyse. This uses v
 ```{r}
 
 detStruct_original <-
-  lapply(behaviors,
-         function(behav) {
-  return(determinantStructure(behav,
-                              list(behaviorRegEx = behav),
-                              determinantVar("intention_original",
-                                             "_int\\w+",
-                                             determinantVar("attitude_original",
-                                                            "_att\\w+"),
-                                             determinantVar("perceivedNorm_original",
-                                                            "_pn\\w+"),
-                                             determinantVar("perceivedBehavioralControl_original",
-                                                            "_pbc\\w+"))));
-});
+  lapply(
+    behaviors,
+    function(behav) {
+      return(
+        behaviorchange::determinantStructure(
+          behav,
+          list(behaviorRegEx = behav),
+          behaviorchange::determinantVar(
+            "intention_original",
+            "_int[a-zA-Z]+$",
+            behaviorchange::determinantVar(
+              "attitude_original",
+              "_att[a-zA-Z]+$"
+            ),
+            behaviorchange::determinantVar(
+              "perceivedNorm_original",
+              "_pn[a-zA-Z]+$"
+            ),
+            behaviorchange::determinantVar(
+              "perceivedBehavioralControl_original",
+              "_pbc[a-zA-Z]+$"
+            )
+          )
+        )
+      );
+    }
+  );
 
 detStruct_short <-
-  lapply(behaviors,
-         function(behav) {
-  return(determinantStructure(behav,
-                              list(behaviorRegEx = behav),
-                              determinantVar("intention_short",
-                                             "_intPlan",
-                                             determinantVar("attitude_short",
-                                                            "_attExperPleasant|_attInstrGood"),
-                                             determinantVar("perceivedNorm_short",
-                                                            "_pnInjunctiveApprove|_pnDescriptiveLikeMe"),
-                                             determinantVar("perceivedBehavioralControl_short",
-                                                            "_pbcCapacityConfidenc|_pbcControlUpToMe"))));
-});
+  lapply(
+    behaviors,
+    function(behav) {
+      return(
+        behaviorchange::determinantStructure(
+          behav,
+          list(behaviorRegEx = behav),
+          behaviorchange::determinantVar(
+            "intention_short",
+            "_intPlan",
+            behaviorchange::determinantVar(
+              "attitude_short",
+              "_attExperPleasant|_attInstrGood"),
+            behaviorchange::determinantVar(
+              "perceivedNorm_short",
+              "_pnInjunctiveApprove|_pnDescriptiveLikeMe"),
+            behaviorchange::determinantVar(
+              "perceivedBehavioralControl_short",
+              "_pbcCapacityConfidenc|_pbcControlUpToMe"
+            )
+          )
+        )
+      );
+    }
+  );
 
 ```
 
@@ -215,12 +245,14 @@ if (length(privateDataFiles) > 0) {
     
       ### First read in a temporary version of the data
       dat <-
-        importLimeSurveyData(datafile = file.path(dataPath,
-                                                  currentFilename),
-                             datafileRegEx = privateDataFileRegEx,
-                             scriptfile = file.path(dataPath,
-                                                    dataLoadScriptName),
-                             categoricalQuestions = categoricalQuestions);
+        limonaid::ls_import_data(
+          datafile = file.path(dataPath,
+                               currentFilename),
+          datafileRegEx = privateDataFileRegEx,
+          scriptfile = file.path(dataPath,
+                                 dataLoadScriptName),
+          categoricalQuestions = categoricalQuestions
+        );
       
       ### Then get the position of the variable used to indicate whether
       ### data should be deleted:
@@ -254,17 +286,17 @@ if (length(privateDataFiles) > 0) {
       fullPrivateDataFile <-
         readLines(file.path(dataPath,
                             currentFilename));
-      cat0("\n\nRead data file '", currentFilename, "'.\n\n");
+      ufs::cat0("\n\nRead data file '", currentFilename, "'.\n\n");
   
       ### Get indices of lines that have to be deleted
       linesToDelete <- grep(dataDeletionRegEx,
                             fullPrivateDataFile);
       
       ### Log deletion
-      cat0("Identified ", length(linesToDelete), " participants who ",
-           "indicated they want their data to be deleted, specifically, ",
-           "the following lines of the original raw dataset:\n\n",
-           vecTxtQ(linesToDelete));
+      ufs::cat0("Identified ", length(linesToDelete), " participants who ",
+                "indicated they want their data to be deleted, specifically, ",
+                "the following lines of the original raw dataset:\n\n",
+                ufs::vecTxtQ(linesToDelete));
       
       ### Delete those lines
       if (length(linesToDelete) > 0) {
@@ -284,7 +316,7 @@ if (length(privateDataFiles) > 0) {
                  file.path(dataPath,
                            newTmpFilename));
   
-      cat0("\n\nStored data file '", newTmpFilename, "'.\n\n");
+      ufs::cat0("\n\nStored data file '", newTmpFilename, "'.\n\n");
   
     });  ### End local namespace
   
@@ -296,11 +328,13 @@ if (length(privateDataFiles) > 0) {
 ########################################################################
 
 dat <-
-  importLimeSurveyData(dataPath = dataPath,
-                       datafileRegEx = publicDataFileRegEx,
-                       scriptfile = file.path(dataPath,
-                                              dataLoadScriptName),
-                       categoricalQuestions = categoricalQuestions);
+  limonaid::ls_import_data(
+    dataPath = dataPath,
+    datafileRegEx = publicDataFileRegEx,
+    scriptfile = file.path(dataPath,
+                           dataLoadScriptName),
+    categoricalQuestions = categoricalQuestions
+  );
 
 ### Add urbanisation using first two numbers of postcode
 dat <- merge(dat,
@@ -338,177 +372,304 @@ rosetta::descr(
 
 ```
 
-# Analyses
-
-## Validity and internal consistency: full measurement instruments {.tabset .tabset-pills}
-
-```{r validity-and-internal-consistency-full, results="asis"}
-
-for (i in seq_along(behaviors)) {
-  ufs::heading("Behavior: ", behaviors[i], headingLevel = 3);
-  
-  intention_varName <-
-    names(detStruct_original[[i]]$children);
-  determinant_varNames <-
-    names(detStruct_original[[i]][[intention_varName]]$children);
-  
-  currentVarNames <-
-    grep(paste0(
-      behaviors[i],
-      detStruct_original[[i]][[intention_varName]]$selection),
-      names(dat), value=TRUE);
-  
-  ufs::heading("Intention", headingLevel = 4);
-  
-  cat("\n\nEigenvalues:",
-      vecTxt(round(eigen(cor(dat[, currentVarNames],
-                             use='complete.obs'))$values, 2)),
-      "\n\n");
-  
-  print(rosetta::rosettaReliability_partial(
-    rosetta::reliability(
-      data = dat,
-      items = currentVarNames,
-      scatterMatrix = TRUE,
-      headingLevel = 5
-    )
-  ));
-
-  for (j in determinant_varNames) {
-    
-    ufs::heading(j, headingLevel = 4);
-    
-    currentVarNames <-
-      grep(paste0(
-        behaviors[i],
-        detStruct_original[[i]][[intention_varName]][[j]]$selection),
-        names(dat), value=TRUE);
-        
-    cat("\n\nEigenvalues: ",
-        vecTxt(round(eigen(cor(dat[, currentVarNames],
-                               use='complete.obs'))$values, 2)),
-        "\n\n");
-    
-    print(rosetta::rosettaReliability_partial(
-      rosetta::reliability(
-        data = dat,
-        items = currentVarNames,
-        scatterMatrix = TRUE,
-        headingLevel = 5
-      )
-    ));
-  }
-  
-}
-
-```
-
-## Validity and internal consistency: brief measurement instruments, subset of long {.tabset .tabset-pills}
-
-```{r validity-and-internal-consistency-brief-subset, results="asis"}
-
-for (i in seq_along(behaviors)) {
-  ufs::heading("Behavior: ", behaviors[i], headingLevel = 3);
-  
-  intention_varName <-
-    names(detStruct_short[[i]]$children);
-  determinant_varNames <-
-    names(detStruct_short[[i]][[intention_varName]]$children);
-  
-  for (j in determinant_varNames) {
-    
-    ufs::heading(j, headingLevel = 4);
-    
-    currentVarNames <-
-      grep(paste0(
-        behaviors[i],
-        detStruct_short[[i]][[intention_varName]][[j]]$selection),
-        names(dat), value=TRUE);
-
-    cat("\n\nEigenvalues: ",
-        vecTxt(round(eigen(cor(dat[dat[, paste0(behaviors[i], "Version")] == "long",
-                               currentVarNames],
-                               use='complete.obs'))$values, 2)),
-        "\n\n");
-    
-    print(rosetta::rosettaReliability_partial(
-      rosetta::reliability(
-        data = dat[dat[paste0(behaviors[i], "Version")] == "long", ],
-        items = currentVarNames,
-        scatterMatrix = TRUE,
-        headingLevel = 5
-      )
-    ));
-  }
-  
-}
-
-```
-
-## Validity and internal consistency: brief measurement instruments, isolated {.tabset .tabset-pills}
-
-```{r validity-and-internal-consistency-brief-isolated, results="asis"}
-
-for (i in seq_along(behaviors)) {
-  ufs::heading("Behavior: ", behaviors[i], headingLevel = 3);
-  
-  intention_varName <-
-    names(detStruct_short[[i]]$children);
-  determinant_varNames <-
-    names(detStruct_short[[i]][[intention_varName]]$children);
-  
-  for (j in determinant_varNames) {
-    
-    ufs::heading(j, headingLevel = 4);
-    
-    currentVarNames <-
-      grep(paste0(
-        behaviors[i],
-        detStruct_short[[i]][[intention_varName]][[j]]$selection),
-        names(dat), value=TRUE);
-
-    cat("\n\nEigenvalues: ",
-        vecTxt(round(eigen(cor(dat[dat[paste0(behaviors[i], "Version")] == "short",
-                               currentVarNames],
-                               use='complete.obs'))$values, 2)),
-        "\n\n");
-    
-    print(rosetta::rosettaReliability_partial(
-      rosetta::reliability(
-        data = dat[dat[, paste0(behaviors[i], "Version")] == "short", ],
-        items = currentVarNames,
-        scatterMatrix = TRUE,
-        headingLevel = 5
-      )
-    ));
-  }
-  
-}
-
-```
-
-## Main results
-
-The aim of this study is to explore the convergent validity of the brief direct measures of the four main constructs as defined in the Reasoned Action Approach: intention, attitude, perceived norms and perceived behavioral control. To this end we compute the correlation coefficients of the original and the brief measures.
-
-```{r results="asis"}
+```{r determinant-structure-variable-names, results="asis"}
 
 ### Add variables names of the determinants' measures and compute
 ### means where necessary
 
 ### Original measures
 for (i in seq_along(detStruct_original)) {
-  detStructAddVarNames(detStruct_original[[i]], names(dat));
-  dat <- detStructComputeScales(detStruct_original[[i]],
-                                dat);
+  behaviorchange::detStructAddVarNames(
+    detStruct_original[[i]],
+    names(dat)
+  );
+  dat <- behaviorchange::detStructComputeScales(
+    detStruct_original[[i]],
+    dat
+  );
 }
 
 ### Short measures
 for (i in seq_along(detStruct_short)) {
-  detStructAddVarNames(detStruct_short[[i]], names(dat));
-  dat <- detStructComputeScales(detStruct_short[[i]],
-                                dat);
+  behaviorchange::detStructAddVarNames(
+    detStruct_short[[i]],
+    names(dat)
+  );
+  dat <- behaviorchange::detStructComputeScales(
+    detStruct_short[[i]],
+    dat
+  );
 }
+
+```
+
+# Analyses
+
+## Validity and internal consistency
+
+```{r validity-and-internal-consistency-full, results="asis"}
+
+validityObject <- function(dat, items, headingLevel = 5) {
+  return(
+    list(
+      eigen = eigen(cor(dat[, items],
+                        use='complete.obs'))$values,
+      reliability = rosetta::reliability(
+                      data = dat,
+                      items = items,
+                      scatterMatrix = TRUE,
+                      headingLevel = headingLevel
+                    )
+    )
+  );
+}
+
+validitySummary <- function(type,
+                            validityObject) {
+  if (length(validityObject$eigen) > 2) {
+    return(
+      data.frame(
+        type = type,
+        eigen = ufs::vecTxt(round(validityObject$eigen[1:2], 2)),
+        omega = ufs::formatCI(
+          validityObject$reliability$scaleStructure$output$omega.ci,
+          noZero=TRUE
+        ),
+        H = ufs::formatR(
+          validityObject$reliability$scaleStructure$output$coefficientH
+        ),
+        glb = ufs::formatR(
+          validityObject$reliability$scaleStructure$output$glb
+        ),
+        alpha = ufs::formatCI(
+          validityObject$reliability$scaleStructure$output$alpha.ci,
+          noZero=TRUE
+        ),
+        spBr = "",
+        n = nrow(validityObject$reliability$data)
+      )
+    );
+  } else {
+    return(
+      data.frame(
+        type = type,
+        eigen = ufs::vecTxt(round(validityObject$eigen[1:2], 2)),
+        omega = "",
+        H = "",
+        glb = "",
+        alpha = ufs::formatR(
+          validityObject$reliability$scaleStructure$output$cronbach.alpha
+        ),
+        spBr = ufs::formatR(
+          validityObject$reliability$scaleStructure$output$spearman.brown
+        ),
+        n = nrow(validityObject$reliability$data)
+      )
+    );
+  }
+}
+
+validityObjects <- function(dat,
+                            version,
+                            behaviors,
+                            detStruct,
+                            type) {
+
+  res <-
+    lapply(
+      seq_along(behaviors),
+      function(i) {
+        
+        ### select rows from the Df
+        tmpDf <-
+          dat[dat[, paste0(behaviors[i], "Version")] == version, ];
+        
+        intention_varName <-
+          names(detStruct[[i]]$children);
+        determinant_varNames <-
+          names(detStruct[[i]][[intention_varName]]$children);
+
+        res <-
+          lapply(
+            determinant_varNames,
+            function(j) {
+              currentVarNames <-
+                unname(
+                  unlist(
+                    detStruct[[i]][[intention_varName]][[j]]$varNames
+                  )
+                );
+              res <- validityObject(
+                dat=tmpDf,
+                items=currentVarNames,
+                headingLevel=5);
+              return(
+                list(
+                  object = res,
+                  summary = validitySummary(type=type,
+                                            validityObject=res)
+                )
+              );
+            }
+          );
+        names(res) <- determinant_varNames;
+        currentVarNames <-
+          unlist(unname(unclass(detStruct[[i]][[intention_varName]]$varNames)));
+        print(currentVarNames);
+        if (length(currentVarNames) > 1) {
+          res$intention <-
+            list(
+              object = validityObject(
+                dat=tmpDf,
+                items=currentVarNames,
+                headingLevel=5
+              )
+            );
+          res$intention$summary <-
+            validitySummary(type=type,
+                            validityObject=res$intention$object);
+        } else {
+          res$intention <- list(
+            object = NULL,
+            summary = res[[1]]$summary
+          );
+          res$intention$summary[, 2:7] <- "";
+        }
+
+        ### Reorder to place intention first
+        res <-
+          res[c('intention',
+                determinant_varNames)];
+        
+        return(res);
+        
+      }
+    );
+  names(res) <- behaviors;
+  return(res);
+}
+
+validity <-
+  list(full = validityObjects(dat = dat,
+                              version = "long",
+                              behaviors = behaviors,
+                              detStruct = detStruct_original,
+                              type="full"),
+       subset = validityObjects(dat = dat,
+                                version = "long",
+                                behaviors = behaviors,
+                                detStruct = detStruct_short,
+                                type="subset"),
+       short = validityObjects(dat = dat,
+                               version = "short",
+                               behaviors = behaviors,
+                               detStruct = detStruct_short,
+                               type = "short")
+  );
+
+validityDf <-
+  do.call(
+    rbind,
+    lapply(
+      names(validity),
+      function(type) {
+        return(
+          do.call(
+            rbind,
+            lapply(
+              names(validity[[type]]),
+              function(behavior) {
+                return(
+                  do.call(
+                    rbind,
+                    lapply(
+                      names(validity[[type]][[behavior]]),
+                      function(determinant) {
+                        return(
+                          cbind(
+                            data.frame(determinant = determinant,
+                                       behavior = behavior),
+                            validity[[type]][[behavior]][[determinant]]$summary
+                          )
+                        );
+                      }
+                    )
+                  )
+                );
+              }
+            )
+          )
+        );
+      }
+    )
+  );
+
+validityDf$determinant_original <-
+  validityDf$determinant;
+validityDf$determinant <-
+  gsub("_.*",
+       "",
+       validityDf$determinant_original);
+
+```
+
+### Validity: intention
+
+```{r validity-intention}
+kableExtra::kable_styling(
+  knitr::kable(
+    validityDf[
+      validityDf$determinant == 'intention',
+      2:9
+    ]
+  )
+);
+```
+
+### Validity: attitude
+
+```{r validity-attitude}
+kableExtra::kable_styling(
+  knitr::kable(
+    validityDf[
+      validityDf$determinant == 'attitude',
+      2:9
+    ]
+  )
+);
+```
+
+### Validity: perceived norm
+
+```{r validity-perceivedNorm}
+kableExtra::kable_styling(
+  knitr::kable(
+    validityDf[
+      validityDf$determinant == 'perceivedNorm',
+      2:9
+    ]
+  )
+);
+```
+
+### Validity: perceived behavioral control
+
+```{r validity-perceivedBehavioralControl}
+kableExtra::kable_styling(
+  knitr::kable(
+    validityDf[
+      validityDf$determinant == 'perceivedBehavioralControl',
+      2:9
+    ]
+  )
+);
+```
+
+## Main results
+
+The aim of this study is to explore the convergent validity of the brief direct measures of the four main constructs as defined in the Reasoned Action Approach: intention, attitude, perceived norms and perceived behavioral control. To this end we compute the correlation coefficients of the original and the brief measures.
+
+```{r main-results, results="asis"}
 
 ### Loop through behaviors
 corTestObjects <- list();
@@ -519,66 +680,71 @@ all_p_values <- c();
 for (i in seq_along(behaviors)) {
 
   ### Title for this behavior
-  cat0("\n\n## ", behaviors[i], "\n");
+  ufs::cat0("\n\n## ", behaviors[i], "\n");
 
   ### Correlation between short and long versions
   corTestObjects[[behaviors[i]]] <-
-    lapply(determinants,
-           function(v) {
-             return(cor.test(dat[, FindNode(detStruct_original[[i]],
-                                            paste0(v, "_original"))$scaleVarName],
-                             dat[, FindNode(detStruct_short[[i]],
-                                            paste0(v, "_short"))$scaleVarName]))
-           });
+    lapply(
+      determinants,
+      function(v) {
+        return(
+          cor.test(
+            dat[, data.tree::FindNode(detStruct_original[[i]],
+                                      paste0(v, "_original"))$scaleVarName],
+            dat[, data.tree::FindNode(detStruct_short[[i]],
+                                      paste0(v, "_short"))$scaleVarName])
+        )
+      }
+    );
   names(corTestObjects[[behaviors[i]]]) <- determinants;
 
   ### Correlations between lean measures for this behavior
   fullVarNames <- detStruct_original[[i]]$Get('scaleVarName')
   fullVarNames <- fullVarNames[!is.na(fullVarNames)];
   corMatrixObjects_full[[behaviors[i]]] <-
-    associationMatrix(dat, x = fullVarNames);
+    ufs::associationMatrix(dat, x = fullVarNames);
   
   ### Correlations between lean measures for this behavior
   leanVarNames <- detStruct_short[[i]]$Get('scaleVarName')
   leanVarNames <- leanVarNames[!is.na(leanVarNames)];
   corMatrixObjects_lean[[behaviors[i]]] <-
-    associationMatrix(dat, x = leanVarNames);
+    ufs::associationMatrix(dat, x = leanVarNames);
 
-  cat0("\n### Correlations between full and lean operationalisations\n\n");
+  ufs::cat0("\n### Correlations between full and lean operationalisations\n\n");
   for (j in names(corTestObjects[[behaviors[i]]])) {
-  cat0("\n- **", j, "**: ",
-       formatCI(corTestObjects[[behaviors[i]]][[j]]$conf.int, noZero=TRUE),
-       ", point estimate = ", formatR(corTestObjects[[behaviors[i]]][[j]]$estimate),
+  ufs::cat0("\n- **", j, "**: ",
+       ufs::formatCI(corTestObjects[[behaviors[i]]][[j]]$conf.int, noZero=TRUE),
+       ", point estimate = ", ufs::formatR(corTestObjects[[behaviors[i]]][[j]]$estimate),
        ", n = ", corTestObjects[[behaviors[i]]][[j]]$parameter + 2);
   }
 
-  cat0("\n\n\n### Correlation matrices using full operationalisations\n\n");
+  ufs::cat0("\n\n\n### Correlation matrices using full operationalisations\n\n");
 
   sampleSize_full <- as.numeric(corMatrixObjects_full[[behaviors[i]]]$output$raw$n);
   sampleSize_full <- unique(sampleSize_full);
   sampleSize_full <- sampleSize_full[!is.na(sampleSize_full)];
-  cat0("\n\nSample size = ", sampleSize_full, "\n\n");
-  pander(corMatrixObjects_full[[behaviors[i]]]);
+  ufs::cat0("\n\nSample size = ", sampleSize_full, "\n\n");
+  pander::pander(corMatrixObjects_full[[behaviors[i]]]);
   
-  cat0("\n### Correlations matrices using lean operationalisations\n\n");
+  ufs::cat0("\n### Correlations matrices using lean operationalisations\n\n");
 
   sampleSize_lean <- as.numeric(corMatrixObjects_lean[[behaviors[i]]]$output$raw$n);
   sampleSize_lean <- unique(sampleSize_lean);
   sampleSize_lean <- sampleSize_lean[!is.na(sampleSize_lean)];
-  cat0("\n\nSample size = ", sampleSize_lean, "\n\n");
-  pander(corMatrixObjects_lean[[behaviors[i]]]);
+  ufs::cat0("\n\nSample size = ", sampleSize_lean, "\n\n");
+  pander::pander(corMatrixObjects_lean[[behaviors[i]]]);
   
-  cat0("\n### Q (effect size for difference between correlations)\n\n");
+  ufs::cat0("\n### Q (effect size for difference between correlations)\n\n");
   
-  fullZ <- convert.r.to.fisherz(corMatrixObjects_full[[i]]$output$raw$es);
-  leanZ <- convert.r.to.fisherz(corMatrixObjects_lean[[i]]$output$raw$es);
+  fullZ <- ufs::convert.r.to.fisherz(corMatrixObjects_full[[i]]$output$raw$es);
+  leanZ <- ufs::convert.r.to.fisherz(corMatrixObjects_lean[[i]]$output$raw$es);
   diffQ <- fullZ - leanZ;
   ZforQ <- diffQ / sqrt((1 / (sampleSize_full - 3)) +
                         (1 / (sampleSize_lean - 3)));
   pforQ <- 2*ifelse(ZforQ < 0, pnorm(ZforQ), 1-pnorm(ZforQ));
   
-  qMatrix <- paste0("q=", formatR(diffQ), "\n",
-                    formatPvalue(pforQ));
+  qMatrix <- paste0("q=", ufs::formatR(diffQ), "\n",
+                    ufs::formatPvalue(pforQ));
   qMatrix <- ifelse(grepl("NA", qMatrix),
                     "",
                     qMatrix);
@@ -588,7 +754,7 @@ for (i in seq_along(behaviors)) {
   rownames(qMatrix) <- determinants;
   colnames(qMatrix) <- determinants;
 
-  pander(qMatrix);
+  pander::pander(qMatrix);
   
   all_p_values <- c(all_p_values, pforQ[!is.na(pforQ)]);
   
